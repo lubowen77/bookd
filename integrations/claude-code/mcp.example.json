@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "bookd": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "bookd", "mcp"],
+      "env": {
+        "BOOKD_URL": "http://127.0.0.1:4123"
+      }
+    }
+  }
+}

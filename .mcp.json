@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "bookd": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PROJECT_DIR:-.}/dist/mcp.js"],
+      "env": {
+        "BOOKD_URL": "http://127.0.0.1:4123"
+      }
+    }
+  }
+}

@@ -41,3 +41,36 @@
 - 新概念图：[`docs/design/bookd-reader-concept.png`](docs/design/bookd-reader-concept.png)。
 - 实现需覆盖书库、目录、阅读正文、选择内容、AI 连接状态、跳转和高亮反馈，并保持正文优先。
 
+## 阶段 1：秒开与只读感知（已完成自测）
+
+- Node HTTP + WebSocket 常驻服务、React 阅读壳和原子状态文件已实现。
+- 真实中文 EPUB 经 UI 文件选择器导入、打开并首次写出状态约 1.5 秒；`/api/state` 返回逻辑章节、CFI、进度和屏内文字。
+- 书库同时保留原文件、逻辑章节 `chapters.json`、逐章 `extracted/*.md` 与 `meta.json`；渲染路径没有模型调用。
+- Browser 面板确认 localhost 与 WebSocket 连通。foliate-js 使用 closed Shadow DOM，正文级自动化改由真实 Playwright 页面完成。
+
+## 阶段 2：双向桥（已完成自测）
+
+- 8 个 MCP 工具全部实现，MCP 进程是无状态 stdio → HTTP 薄客户端。
+- 真实 stdio 子进程可列出并调用全部工具；HTTP/MCP `goto` 已将 EPUB 精确跳到“自旋玻璃：引入无序”。
+- 阅读器与 MCP 创建的高亮会实时出现在 UI，并双写 `annotations.json` / `notes.md`；MCP 清除后 UI 和两份文件同步归零。
+- 选区工具条连续触发 3 次时 DOM 中仍只有 1 个实例，完整位于视口内；滚动、Esc、关闭、保存和 10 秒超时均会清理。
+
+## 阶段 3：格式与书库（已完成自测）
+
+- 真实 Chromium 已打开同一本中文 EPUB、MOBI6 与 AZW3/KF8；MOBI 的 55 个、AZW3 的 53 个原始 section 均归并为 11 个逻辑章节并保留 CFI。
+- MOBI/AZW3 书内元数据会在浏览器解析后补回正式书名和作者。
+- 参考 Markdown 文件夹按 11 个文件导入为 11 个逻辑章节；文件内二级标题不会额外拆章。
+- 桌面三栏和 580×720 响应式布局已回归；移动端左右抽屉默认收起、选书后自动关闭、无横向溢出。
+
+## 阶段 4：打磨与开源准备（核心完成，PDF 延后）
+
+- 完成默认主题、选区/批注交互、搜索、明暗主题、Claude Code skill、项目级 `.mcp.json` 和 Browser launch 配置。
+- 电子书 HTML 会移除脚本、事件属性与 `javascript:` URL，并覆盖注入严格 CSP；对应安全测试通过。
+- `bookd start` 已验证后台启动和复用；npm 生产打包、依赖审计与真实构建均通过。
+- PDF 管线没有启用：现有 MinerU 是联网 Electron GUI 且没有 CLI。遵照用户要求不重复安装；等用户提供明确的本地 CLI 再接入可插拔转换器。
+
+## 当前验收状态
+
+- 自动化自测：完成。
+- Claude Code 配置：CLI 已识别 `bookd`，首次项目会话显示 `Pending approval`，符合项目级 MCP 的一次性信任流程。
+- 剩余人工验收：用户在 Claude Code 中批准 MCP 后，确认 Browser 侧栏“打开书 → 询问当前段落 → 跳转/高亮”的主观体验。

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bookd",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["dist/cli.js", "serve", "--port", "4123"],
+      "port": 4123
+    }
+  ]
+}
