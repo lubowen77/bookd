@@ -67,6 +67,7 @@
 - 完成默认主题、选区/批注交互、搜索、明暗主题、Claude Code skill、项目级 `.mcp.json` 和 Browser launch 配置。
 - 电子书 HTML 会移除脚本、事件属性与 `javascript:` URL，并覆盖注入严格 CSP；对应安全测试通过。
 - `bookd start` 已验证后台启动和复用；npm 生产打包、依赖审计与真实构建均通过。
+- npm tarball 已安装到隔离目录，并从包目录之外启动；Web UI 返回 200，真实 EPUB 导入为 11 个逻辑章节，证明发布包不依赖仓库当前工作目录。
 - PDF 管线没有启用：现有 MinerU 是联网 Electron GUI 且没有 CLI。遵照用户要求不重复安装；等用户提供明确的本地 CLI 再接入可插拔转换器。
 
 ## 当前验收状态
