@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
-  BookOpen, Bookmark, ChevronLeft, ChevronRight, CircleAlert, Copy, FileUp,
+  BookOpen, Bookmark, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Copy, FileUp,
   FolderOpen, Highlighter, Library, Menu, Moon, NotebookPen, PanelLeftClose, PanelRightClose,
   Search, Sun, Trash2, Wifi, WifiOff, X,
 } from 'lucide-react'
@@ -40,6 +40,7 @@ export default function App() {
   const [searchResults, setSearchResults] = useState<Array<{ chapter: number; title: string; excerpt: string; cfi?: string; href?: string }>>([])
   const [settings, setSettings] = useState(loadSettings)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [contextOpen, setContextOpen] = useState(false)
   const [localCommand, setLocalCommand] = useState<{ id: number; command: ReaderCommand } | null>(null)
   const localCommandId = useRef(0)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -437,10 +438,21 @@ export default function App() {
           </div> : <div className="companion-empty">选中正文后，这里会出现原文、出处与笔记入口。</div>}
         </section>
         <section className="companion-section bridge-card">
-          <div className="section-title">阅读上下文</div>
+          <button
+            type="button"
+            className="section-title bridge-toggle"
+            aria-expanded={contextOpen}
+            aria-controls="reading-context-details"
+            onClick={() => setContextOpen(value => !value)}
+          >
+            <span>阅读上下文</span>
+            <ChevronDown size={15} />
+          </button>
           <div className="bridge-status"><span className={connected ? 'status-dot' : 'status-dot offline'} />{connected ? '同步通道已连接' : '等待本地桥重连'}</div>
-          <p>{readingState.visibleTextHead || '开始阅读后，AI 可通过 MCP 获取当前章节、CFI 和屏幕内文本。'}</p>
-          {readingState.cfi && <code>{readingState.cfi}</code>}
+          {contextOpen && <div id="reading-context-details" className="bridge-details">
+            <p>{readingState.visibleTextHead || '开始阅读后，AI 可通过 MCP 获取当前章节、CFI 和屏幕内文本。'}</p>
+            {readingState.cfi && <code>{readingState.cfi}</code>}
+          </div>}
         </section>
         <section className="companion-section annotations-section">
           <div className="section-title">我的批注</div>

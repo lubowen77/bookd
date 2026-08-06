@@ -64,7 +64,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
   transition: opacity .18s ease, transform .25s ease; z-index: 20;
 }
 .left-rail { border-right: 1px solid var(--line); }
-.right-rail { border-left: 1px solid var(--line); }
+.right-rail { display: flex; flex-direction: column; border-left: 1px solid var(--line); }
 .left-closed .left-rail { opacity: 0; transform: translateX(-100%); pointer-events: none; }
 .right-closed .right-rail { opacity: 0; transform: translateX(100%); pointer-events: none; }
 .rail-tabs { height: 50px; display: flex; align-items: center; border-bottom: 1px solid var(--line); padding: 0 16px 0 24px; }
@@ -230,12 +230,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .selection-card > button { margin-top: 9px; display: flex; align-items: center; gap: 7px; border: 1px solid var(--accent); background: none; color: #dbc083; padding: 8px 11px; cursor: pointer; font-size: 11px; }
 .companion-empty { min-height: 88px; display: grid; place-items: center; text-align: center; border: 1px dashed var(--line); padding: 14px; color: #74736f; font-size: 11px; line-height: 1.7; }
 .companion-empty.compact { min-height: 70px; }
-.bridge-card p { max-height: 88px; overflow: hidden; color: #98958e; font-family: "Noto Serif SC", serif; font-size: 11px; line-height: 1.7; }
-.bridge-card code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #6f706d; font-family: ui-monospace, monospace; font-size: 9px; }
+.bridge-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.bridge-toggle svg { flex: 0 0 auto; transition: transform .15s ease; }
+.bridge-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+.bridge-details { max-height: 40vh; overflow-y: auto; margin-top: 12px; padding-right: 4px; scrollbar-width: thin; scrollbar-color: #454545 transparent; }
+.bridge-details p { margin: 0 0 10px; color: #98958e; font-family: "Noto Serif SC", serif; font-size: 11px; line-height: 1.7; }
+.bridge-details code { display: block; overflow-wrap: anywhere; color: #6f706d; font-family: ui-monospace, monospace; font-size: 9px; white-space: normal; }
 .bridge-status { display: flex; align-items: center; gap: 7px; color: #c5c0b5; font-size: 12px; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #65b56e; box-shadow: 0 0 0 3px rgba(101,181,110,.08); }
 .status-dot.offline { background: #9b745d; }
-.annotations-section { height: calc(100% - 50px - 320px); overflow: hidden; }
+.annotations-section { flex: 1; min-height: 0; overflow: hidden; }
 .annotation-list { max-height: calc(100% - 25px); overflow: auto; scrollbar-width: thin; scrollbar-color: #454545 transparent; }
 .annotation-card { margin-bottom: 9px; padding: 12px; }
 .annotation-card blockquote { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; font-size: 11px; }
