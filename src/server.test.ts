@@ -30,6 +30,13 @@ describe('bookd HTTP + WebSocket', () => {
     await fs.rm(root, { recursive: true, force: true })
   })
 
+  it('拒绝非白名单 Host，同时允许 vite dev 保留的回环 Host 与端口', async () => {
+    await request(server.app).get('/api/health').set('Host', 'bookd.evil.example').expect(403)
+    await request(server.app).get('/api/health').set('Host', '127.0.0.1:5173').expect(200)
+    await request(server.app).get('/api/health').set('Host', 'localhost:5173').expect(200)
+    await request(server.app).get('/api/health').set('Host', '[::1]:5173').expect(200)
+  })
+
   it('导入书籍并在 2 秒内提供状态与章节 API', async () => {
     const started = performance.now()
     const imported = await request(server.app).post('/api/books/import').attach('book', makeTestEpub(), 'test.epub').expect(201)

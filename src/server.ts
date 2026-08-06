@@ -15,6 +15,21 @@ const asyncRoute = (handler: (request: Request, response: Response, next: NextFu
 
 const param = (value: string | string[]) => Array.isArray(value) ? value[0] : value
 
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1'])
+
+const normalizeHostname = (hostname: string) => hostname
+  .trim()
+  .toLowerCase()
+  .replace(/^\[|\]$/g, '')
+
+const hostHeaderHostname = (host: string): string | null => {
+  try {
+    return normalizeHostname(new URL(`http://${host}`).hostname)
+  } catch {
+    return null
+  }
+}
+
 export interface BookdServer {
   app: express.Express
   httpServer: http.Server
@@ -73,6 +88,16 @@ export const createBookdServer = async (overrides: Partial<BookdConfig> = {}): P
   })
 
   app.disable('x-powered-by')
+  const allowedHosts = new Set(LOOPBACK_HOSTS)
+  allowedHosts.add(normalizeHostname(config.host))
+  app.use((request, response, next) => {
+    const hostname = request.headers.host ? hostHeaderHostname(request.headers.host) : null
+    if (!hostname || !allowedHosts.has(hostname)) {
+      response.status(403).json({ error: '请求来源不受信任' })
+      return
+    }
+    next()
+  })
   app.use(express.json({ limit: '40mb' }))
   app.use((request, response, next) => {
     response.setHeader('X-Content-Type-Options', 'nosniff')
