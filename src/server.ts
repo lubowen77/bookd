@@ -30,6 +30,16 @@ const hostHeaderHostname = (host: string): string | null => {
   }
 }
 
+const isLoopbackOrigin = (origin: string): boolean => {
+  try {
+    const url = new URL(origin)
+    return (url.protocol === 'http:' || url.protocol === 'https:')
+      && LOOPBACK_HOSTS.has(normalizeHostname(url.hostname))
+  } catch {
+    return false
+  }
+}
+
 export interface BookdServer {
   app: express.Express
   httpServer: http.Server
@@ -67,8 +77,13 @@ export const createBookdServer = async (overrides: Partial<BookdConfig> = {}): P
 
   state.on('change', current => broadcast({ type: 'state', state: current }))
   httpServer.on('upgrade', (request, socket, head) => {
-    const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`)
+    const url = new URL(request.url ?? '/', 'http://localhost')
     if (url.pathname !== '/ws') {
+      socket.destroy()
+      return
+    }
+    const origin = request.headers.origin
+    if (origin && !isLoopbackOrigin(origin)) {
       socket.destroy()
       return
     }

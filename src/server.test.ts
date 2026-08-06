@@ -15,6 +15,11 @@ const nextMessage = (socket: WebSocket) => new Promise<any>((resolve, reject) =>
   })
 })
 
+const openSocket = (socket: WebSocket) => new Promise<void>((resolve, reject) => {
+  socket.once('open', resolve)
+  socket.once('error', reject)
+})
+
 describe('bookd HTTP + WebSocket', () => {
   let root: string
   let server: BookdServer
@@ -48,11 +53,38 @@ describe('bookd HTTP + WebSocket', () => {
     expect(performance.now() - started).toBeLessThan(2000)
   })
 
+  it('拒绝跨源 WebSocket，同时允许无 Origin 与 vite dev Origin', async () => {
+    const address = await server.start()
+    const url = `ws://${address.host}:${address.port}/ws`
+    const attacker = new WebSocket(url, { origin: 'https://evil.example.com' })
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('跨源 WebSocket 未被及时拒绝')), 3000)
+      attacker.once('open', () => reject(new Error('跨源 WebSocket 不应连接成功')))
+      attacker.once('message', () => reject(new Error('跨源 WebSocket 不应收到 hello')))
+      attacker.once('error', () => {
+        clearTimeout(timeout)
+        resolve()
+      })
+    })
+
+    const noOrigin = new WebSocket(url)
+    const noOriginHello = nextMessage(noOrigin)
+    await openSocket(noOrigin)
+    expect((await noOriginHello).type).toBe('hello')
+    noOrigin.close()
+
+    const viteDev = new WebSocket(url, { origin: 'http://127.0.0.1:5173' })
+    const viteHello = nextMessage(viteDev)
+    await openSocket(viteDev)
+    expect((await viteHello).type).toBe('hello')
+    viteDev.close()
+  })
+
   it('双向传递状态与 goto 命令', async () => {
     const address = await server.start()
     const socket = new WebSocket(`ws://${address.host}:${address.port}/ws`)
     const helloPromise = nextMessage(socket)
-    await new Promise<void>((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject) })
+    await openSocket(socket)
     expect((await helloPromise).type).toBe('hello')
 
     const statePromise = nextMessage(socket)
