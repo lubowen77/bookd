@@ -13,6 +13,7 @@ interface Props {
   command: { id: number; command: ReaderCommand } | null
   settings: ReaderSettings
   onProgress: (state: { chapter: string; chapterIndex: number; cfi: string; progress: number; visibleTextHead: string }) => void
+  onEdgeHover: (edge: 'left' | 'right' | null) => void
   onSelection: (selection: ReadingSelection | null) => void
   onCached: (book: BookMeta) => void
   onError: (message: string) => void
@@ -35,7 +36,7 @@ const applySettings = (element: FoliateViewElement, settings: ReaderSettings) =>
   renderer.setStyles?.(makeEbookStyles(settings))
 }
 
-export function FoliateReader({ book, restoreCfi, annotations, command, settings, onProgress, onSelection, onCached, onError }: Props) {
+export function FoliateReader({ book, restoreCfi, annotations, command, settings, onProgress, onEdgeHover, onSelection, onCached, onError }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<FoliateViewElement | null>(null)
   const annotationMap = useRef(new Map<string, Annotation>())
@@ -66,6 +67,24 @@ export function FoliateReader({ book, restoreCfi, annotations, command, settings
         const clearSelection = () => onSelection(null)
         const onLoad = (event: Event) => {
           const { doc, index } = (event as CustomEvent<{ doc: Document; index: number }>).detail
+          let hoverFrame = 0
+          let pendingEdge: 'left' | 'right' | null = null
+          let reportedEdge: 'left' | 'right' | null = null
+          const reportEdge = () => {
+            hoverFrame = 0
+            if (pendingEdge === reportedEdge) return
+            reportedEdge = pendingEdge
+            onEdgeHover(reportedEdge)
+          }
+          const scheduleEdge = (edge: 'left' | 'right' | null) => {
+            pendingEdge = edge
+            if (!hoverFrame) hoverFrame = requestAnimationFrame(reportEdge)
+          }
+          const onMouseMove = (mouseEvent: MouseEvent) => {
+            const width = doc.defaultView?.innerWidth ?? doc.documentElement.clientWidth
+            scheduleEdge(mouseEvent.clientX <= 120 ? 'left' : mouseEvent.clientX >= width - 120 ? 'right' : null)
+          }
+          const onMouseLeave = () => scheduleEdge(null)
           const onMouseUp = () => {
             requestAnimationFrame(() => {
               const selection = doc.defaultView?.getSelection()
@@ -87,13 +106,19 @@ export function FoliateReader({ book, restoreCfi, annotations, command, settings
               clearSelection()
             }
           }
+          doc.addEventListener('mousemove', onMouseMove, { passive: true })
+          doc.addEventListener('mouseleave', onMouseLeave)
           doc.addEventListener('mouseup', onMouseUp)
           doc.addEventListener('keydown', onKeyDown)
           doc.defaultView?.addEventListener('scroll', clearSelection, { passive: true })
           cleanups.push(() => {
+            doc.removeEventListener('mousemove', onMouseMove)
+            doc.removeEventListener('mouseleave', onMouseLeave)
             doc.removeEventListener('mouseup', onMouseUp)
             doc.removeEventListener('keydown', onKeyDown)
             doc.defaultView?.removeEventListener('scroll', clearSelection)
+            if (hoverFrame) cancelAnimationFrame(hoverFrame)
+            if (reportedEdge) onEdgeHover(null)
           })
         }
         const onRelocate = (event: Event) => {

@@ -41,6 +41,7 @@ export default function App() {
   const [settings, setSettings] = useState(loadSettings)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [contextOpen, setContextOpen] = useState(false)
+  const [pageArrowEdge, setPageArrowEdge] = useState<'left' | 'right' | null>(null)
   const [localCommand, setLocalCommand] = useState<{ id: number; command: ReaderCommand } | null>(null)
   const localCommandId = useRef(0)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -345,7 +346,10 @@ export default function App() {
       </aside>
       <button type="button" className="side-reopen" onClick={() => setLeftOpen(true)} aria-label="展开书库" title="展开书库"><ChevronRight size={17} /></button>
 
-      <main className="reader-stage">
+      <main
+        className={`reader-stage ${pageArrowEdge ? `edge-${pageArrowEdge}` : ''}`}
+        onMouseLeave={() => setPageArrowEdge(null)}
+      >
         {activeBook && <ReaderSettingsPanel
           format={activeBook.format}
           open={settingsOpen}
@@ -355,6 +359,8 @@ export default function App() {
         />}
 
         {activeBook && <>
+          <div className="reader-edge-zone reader-edge-zone-left" aria-hidden="true" />
+          <div className="reader-edge-zone reader-edge-zone-right" aria-hidden="true" />
           <button
             type="button"
             className="page-arrow page-arrow-left"
@@ -402,6 +408,7 @@ export default function App() {
             command={currentCommand}
             settings={settings}
             onProgress={progress}
+            onEdgeHover={setPageArrowEdge}
             onSelection={updateSelection}
             onCached={book => { setActiveBook(book); void refreshBooks() }}
             onError={setError}
