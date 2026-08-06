@@ -4,29 +4,14 @@ import 'foliate-js/view.js'
 import type { Annotation, BookMeta, ReaderCommand, ReadingSelection } from '../shared'
 import { api } from './api'
 import { hardenBookDocument } from './book-document'
-
-const ebookStyles = `
-  :root { color-scheme: light; }
-  html { background: #f5f0e7 !important; color: #242321 !important; }
-  body {
-    max-width: none; margin: 0 !important; padding: 0 !important;
-    font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif !important;
-    font-size: 1.08rem; line-height: 1.95; letter-spacing: .025em;
-  }
-  p, li, blockquote, dd { line-height: 1.95; text-align: justify; }
-  h1, h2, h3 { font-family: "Songti SC", "STSong", serif; font-weight: 500; line-height: 1.45; }
-  h1, h2 { margin: 2.2em 0 1.25em; }
-  h3 { margin: 1.8em 0 .8em; }
-  img { max-width: 100%; height: auto; }
-  a { color: #7a5b2b; text-underline-offset: .22em; }
-  ::selection { background: rgba(197, 153, 68, .32); }
-`
+import { makeEbookStyles, type ReaderSettings } from './settings'
 
 interface Props {
   book: BookMeta
   restoreCfi?: string | null
   annotations: Annotation[]
   command: { id: number; command: ReaderCommand } | null
+  settings: ReaderSettings
   onProgress: (state: { chapter: string; chapterIndex: number; cfi: string; progress: number; visibleTextHead: string }) => void
   onSelection: (selection: ReadingSelection | null) => void
   onCached: (book: BookMeta) => void
@@ -36,12 +21,28 @@ interface Props {
 const chapterTitle = (doc: Document, index: number) =>
   doc.querySelector('h1, h2, h3, title')?.textContent?.trim() || `第 ${index + 1} 节`
 
-export function FoliateReader({ book, restoreCfi, annotations, command, onProgress, onSelection, onCached, onError }: Props) {
+const applySettings = (element: FoliateViewElement, settings: ReaderSettings) => {
+  const renderer = element.renderer
+  if (!renderer) return
+  if (settings.view === 'scroll') {
+    renderer.setAttribute('flow', 'scrolled')
+  } else {
+    renderer.setAttribute('flow', 'paginated')
+    renderer.setAttribute('max-column-count', settings.view === 'spread' ? '2' : '1')
+    renderer.setAttribute('max-inline-size', settings.view === 'spread' ? '560px' : '720px')
+    renderer.setAttribute('gap', '7%')
+  }
+  renderer.setStyles?.(makeEbookStyles(settings))
+}
+
+export function FoliateReader({ book, restoreCfi, annotations, command, settings, onProgress, onSelection, onCached, onError }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<FoliateViewElement | null>(null)
   const annotationMap = useRef(new Map<string, Annotation>())
   const logicalChapter = useRef(0)
+  const settingsRef = useRef(settings)
   const [loading, setLoading] = useState(true)
+  settingsRef.current = settings
 
   useEffect(() => {
     let disposed = false
@@ -137,7 +138,7 @@ export function FoliateReader({ book, restoreCfi, annotations, command, onProgre
         }
         transformTarget?.addEventListener('data', harden)
         cleanups.push(() => transformTarget?.removeEventListener('data', harden))
-        element.renderer?.setStyles?.(ebookStyles)
+        applySettings(element, settingsRef.current)
         await element.init({ lastLocation: restoreCfi || undefined, showTextStart: !restoreCfi })
         const locations = element.book.sections.map((section: any, index: number) => ({
           href: section.href ?? (section.id == null ? undefined : String(section.id)),
@@ -208,6 +209,11 @@ export function FoliateReader({ book, restoreCfi, annotations, command, onProgre
       if (view.current === openedElement) view.current = null
     }
   }, [book.id])
+
+  useEffect(() => {
+    const element = view.current
+    if (element) applySettings(element, settings)
+  }, [settings])
 
   useEffect(() => {
     annotationMap.current = new Map(annotations.map(annotation => [annotation.id, annotation]))

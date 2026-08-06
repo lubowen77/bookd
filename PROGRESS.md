@@ -75,3 +75,13 @@
 - 自动化自测：完成。
 - Claude Code 配置：CLI 已识别 `bookd`，首次项目会话显示 `Pending approval`，符合项目级 MCP 的一次性信任流程。
 - 剩余人工验收：用户在 Claude Code 中批准 MCP 后，确认 Browser 侧栏“打开书 → 询问当前段落 → 跳转/高亮”的主观体验。
+
+## 阅读器 UX 迭代（2026-08-06）
+
+- 状态文案改为“同步通道已连接”，品牌展示统一为 `BookD` 并修正顶栏垂直对齐。
+- UI 与 WebSocket 两条划线路径共用按 ID upsert，修复单次划线出现两条批注；新增 3 个单测。
+- 左右侧栏重开按钮移到侧栏外，桌面单侧/双侧收起后都能从屏幕边缘恢复，移动抽屉保持原行为。
+- WebSocket 断线期间合并暂存最新阅读状态，重连后自动补发；真实停服、离线翻页、重启流程已验证。
+- EPUB 与 Markdown 统一支持全局方向键、左右浮动翻页/切章按钮；输入框和搜索浮层内方向键不抢占。
+- 新增视图、字号、字体和四色纸面设置，写入 `bookd:reader-settings`；EPUB iframe、分页边条、外层舞台和 Markdown 正文同步应用，刷新后保留。
+- `npm run typecheck`、`npm test`（18 项）和 `npm run build` 通过；4123 构建产物已完成桌面、580×720、EPUB、隔离 Markdown 与 MCP 划线验收。

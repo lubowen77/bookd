@@ -13,6 +13,7 @@ export const useBookdSocket = (
   const socket = useRef<WebSocket | null>(null)
   const retry = useRef<number | undefined>(undefined)
   const commandId = useRef(0)
+  const pending = useRef<Partial<ReadingState> | null>(null)
   const [socketState, setSocketState] = useState<SocketState>({ connected: false, lastCommand: null })
 
   useEffect(() => {
@@ -21,7 +22,13 @@ export const useBookdSocket = (
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
       const ws = new WebSocket(`${protocol}//${location.host}/ws`)
       socket.current = ws
-      ws.addEventListener('open', () => setSocketState(current => ({ ...current, connected: true })))
+      ws.addEventListener('open', () => {
+        setSocketState(current => ({ ...current, connected: true }))
+        if (pending.current) {
+          ws.send(JSON.stringify({ type: 'state:update', state: pending.current }))
+          pending.current = null
+        }
+      })
       ws.addEventListener('message', event => {
         const message = JSON.parse(event.data) as SocketMessage
         if (message.type === 'hello') {
@@ -54,6 +61,8 @@ export const useBookdSocket = (
   const sendState = useCallback((state: Partial<ReadingState>) => {
     if (socket.current?.readyState === WebSocket.OPEN) {
       socket.current.send(JSON.stringify({ type: 'state:update', state }))
+    } else {
+      pending.current = { ...pending.current, ...state }
     }
   }, [])
 

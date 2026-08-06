@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   BookOpen, Bookmark, ChevronLeft, ChevronRight, CircleAlert, Copy, FileUp,
   FolderOpen, Highlighter, Library, Menu, Moon, NotebookPen, PanelLeftClose, PanelRightClose,
@@ -6,9 +6,12 @@ import {
 } from 'lucide-react'
 import type { Annotation, BookMeta, ReaderCommand, ReadingSelection, ReadingState } from '../shared'
 import { EMPTY_READING_STATE } from '../shared'
+import { upsertAnnotation } from './annotations'
 import { api } from './api'
 import { FoliateReader } from './FoliateReader'
 import { MarkdownReader } from './MarkdownReader'
+import { ReaderSettingsPanel } from './ReaderSettingsPanel'
+import { FONT_FAMILIES, loadSettings, saveSettings } from './settings'
 import { useBookdSocket } from './useBookdSocket'
 
 const formatPercent = (value: number) => `${Math.round(value * 100)}%`
@@ -35,6 +38,8 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Array<{ chapter: number; title: string; excerpt: string; cfi?: string; href?: string }>>([])
+  const [settings, setSettings] = useState(loadSettings)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [localCommand, setLocalCommand] = useState<{ id: number; command: ReaderCommand } | null>(null)
   const localCommandId = useRef(0)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -67,9 +72,7 @@ export default function App() {
         setRightOpen(false)
       }
     } else if (command.type === 'highlight') {
-      setAnnotations(current => current.some(item => item.id === command.annotation.id)
-        ? current
-        : [...current, command.annotation])
+      setAnnotations(current => upsertAnnotation(current, command.annotation))
     } else if (command.type === 'clear-highlights') {
       setAnnotations(current => current.filter(item =>
         command.bookId && item.bookId !== command.bookId
@@ -95,25 +98,6 @@ export default function App() {
   }, [activeId])
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setSelection(null)
-        setSearchOpen(false)
-      }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault()
-        setSearchOpen(true)
-      }
-      if (event.key === '/' && !['INPUT', 'TEXTAREA'].includes((event.target as HTMLElement)?.tagName)) {
-        event.preventDefault()
-        setSearchOpen(true)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
-
-  useEffect(() => {
     if (!selection) return
     const timeout = window.setTimeout(() => setSelection(null), 10_000)
     return () => window.clearTimeout(timeout)
@@ -136,15 +120,18 @@ export default function App() {
     return () => window.clearTimeout(timeout)
   }, [activeId, searchQuery])
 
+  useEffect(() => saveSettings(settings), [settings])
+  useEffect(() => setSettingsOpen(false), [activeId])
+
   const readerCommand = useMemo(() => {
     if (lastCommand && localCommand) return lastCommand.id > localCommand.id ? lastCommand : localCommand
     return lastCommand ?? localCommand
   }, [lastCommand, localCommand])
 
-  const dispatchLocal = (command: ReaderCommand) => {
+  const dispatchLocal = useCallback((command: ReaderCommand) => {
     localCommandId.current = Math.max(localCommandId.current + 1, Date.now())
     setLocalCommand({ id: localCommandId.current, command })
-  }
+  }, [])
 
   const selectBook = (bookId: string) => {
     setActiveId(bookId)
@@ -223,7 +210,7 @@ export default function App() {
         note,
         source: 'reader',
       })
-      setAnnotations(current => [...current, result.annotation])
+      setAnnotations(current => upsertAnnotation(current, result.annotation))
       setSelection(null)
       setNote('')
       window.getSelection()?.removeAllRanges()
@@ -247,20 +234,66 @@ export default function App() {
     setSelection(null)
   }
 
-  const gotoChapter = (index: number) => {
+  const gotoChapter = useCallback((index: number) => {
     setChapterIndex(index)
     dispatchLocal({ type: 'goto', bookId: activeBook?.id, chapter: index })
-  }
+  }, [activeBook?.id, dispatchLocal])
+
+  const pageBackward = useCallback(() => {
+    if (!activeBook) return
+    if (activeBook.format === 'markdown') gotoChapter(Math.max(0, chapterIndex - 1))
+    else dispatchLocal({ type: 'page', direction: 'previous' })
+  }, [activeBook, chapterIndex, dispatchLocal, gotoChapter])
+
+  const pageForward = useCallback(() => {
+    if (!activeBook) return
+    if (activeBook.format === 'markdown') gotoChapter(Math.min(activeBook.chapters.length - 1, chapterIndex + 1))
+    else dispatchLocal({ type: 'page', direction: 'next' })
+  }, [activeBook, chapterIndex, dispatchLocal, gotoChapter])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target instanceof HTMLElement ? event.target : null
+      const isTextEntry = Boolean(target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable))
+      if (event.key === 'Escape') {
+        setSelection(null)
+        setSearchOpen(false)
+        setSettingsOpen(false)
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setSearchOpen(true)
+      }
+      if (event.key === '/' && !isTextEntry) {
+        event.preventDefault()
+        setSearchOpen(true)
+      }
+      if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && activeBook && !searchOpen && !isTextEntry) {
+        event.preventDefault()
+        if (event.key === 'ArrowLeft') pageBackward()
+        else pageForward()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [activeBook, pageBackward, pageForward, searchOpen])
 
   const currentCommand = readerCommand
   const currentProgress = readingState.book === activeBook?.id ? readingState.progress : 0
+  const readerStyle = {
+    '--reader-font-family': FONT_FAMILIES[settings.fontFamily],
+    '--reader-font-size': `${settings.fontSize}rem`,
+  } as CSSProperties
 
   return (
     <div className={`app-shell ${dark ? 'theme-dark' : 'theme-light'} ${!leftOpen ? 'left-closed' : ''} ${!rightOpen ? 'right-closed' : ''}`}
+      data-paper={settings.paper}
+      data-font={settings.fontFamily}
+      style={readerStyle}
       onDragOver={event => event.preventDefault()}
       onDrop={event => { event.preventDefault(); void importFiles(event.dataTransfer.files) }}>
       <header className="topbar">
-        <div className="brand"><span className="brand-word">bookd</span><span className="brand-sub">伴读阅读器</span></div>
+        <div className="brand"><span className="brand-word">BookD</span></div>
         <div className="book-status">
           <span className="current-title">{activeBook?.title ?? '本地书库'}</span>
           <span className="progress-number">{formatPercent(currentProgress)}</span>
@@ -308,10 +341,37 @@ export default function App() {
             ))}
           </ol>
         </>}
-        <button className="side-reopen" onClick={() => setLeftOpen(true)}><ChevronRight size={17} /></button>
       </aside>
+      <button type="button" className="side-reopen" onClick={() => setLeftOpen(true)} aria-label="展开书库" title="展开书库"><ChevronRight size={17} /></button>
 
       <main className="reader-stage">
+        {activeBook && <ReaderSettingsPanel
+          format={activeBook.format}
+          open={settingsOpen}
+          settings={settings}
+          onChange={setSettings}
+          onOpenChange={setSettingsOpen}
+        />}
+
+        {activeBook && <>
+          <button
+            type="button"
+            className="page-arrow page-arrow-left"
+            onClick={pageBackward}
+            aria-label={activeBook.format === 'markdown' ? '上一章' : '上一页'}
+            title={activeBook.format === 'markdown' ? '上一章' : '上一页'}
+            disabled={activeBook.format === 'markdown' && chapterIndex <= 0}
+          ><ChevronLeft size={22} /></button>
+          <button
+            type="button"
+            className="page-arrow page-arrow-right"
+            onClick={pageForward}
+            aria-label={activeBook.format === 'markdown' ? '下一章' : '下一页'}
+            title={activeBook.format === 'markdown' ? '下一章' : '下一页'}
+            disabled={activeBook.format === 'markdown' && chapterIndex >= activeBook.chapters.length - 1}
+          ><ChevronRight size={22} /></button>
+        </>}
+
         {!activeBook ? (
           <section className="welcome">
             <div className="welcome-orbits"><span /><span /><span /></div>
@@ -339,6 +399,7 @@ export default function App() {
             restoreCfi={readingState.book === activeBook.id ? readingState.cfi : null}
             annotations={annotations}
             command={currentCommand}
+            settings={settings}
             onProgress={progress}
             onSelection={updateSelection}
             onCached={book => { setActiveBook(book); void refreshBooks() }}
@@ -347,9 +408,9 @@ export default function App() {
         )}
 
         {activeBook && <nav className="page-controls" aria-label={activeBook.format === 'markdown' ? '章节跳转' : '翻页'}>
-          <button onClick={() => activeBook.format === 'markdown' ? gotoChapter(Math.max(0, chapterIndex - 1)) : dispatchLocal({ type: 'page', direction: 'previous' })}><ChevronLeft size={18} /></button>
+          <button type="button" onClick={pageBackward} aria-label={activeBook.format === 'markdown' ? '上一章' : '上一页'}><ChevronLeft size={18} /></button>
           <span>{readingState.chapter || activeBook.chapters[chapterIndex]?.title || '阅读中'}</span>
-          <button onClick={() => activeBook.format === 'markdown' ? gotoChapter(Math.min(activeBook.chapters.length - 1, chapterIndex + 1)) : dispatchLocal({ type: 'page', direction: 'next' })}><ChevronRight size={18} /></button>
+          <button type="button" onClick={pageForward} aria-label={activeBook.format === 'markdown' ? '下一章' : '下一页'}><ChevronRight size={18} /></button>
         </nav>}
 
         {selection && <div className="selection-toolbar" role="toolbar" aria-label="选区操作">
@@ -377,7 +438,7 @@ export default function App() {
         </section>
         <section className="companion-section bridge-card">
           <div className="section-title">阅读上下文</div>
-          <div className="bridge-status"><span className={connected ? 'status-dot' : 'status-dot offline'} />{connected ? '状态正在同步' : '等待本地桥重连'}</div>
+          <div className="bridge-status"><span className={connected ? 'status-dot' : 'status-dot offline'} />{connected ? '同步通道已连接' : '等待本地桥重连'}</div>
           <p>{readingState.visibleTextHead || '开始阅读后，AI 可通过 MCP 获取当前章节、CFI 和屏幕内文本。'}</p>
           {readingState.cfi && <code>{readingState.cfi}</code>}
         </section>
@@ -392,8 +453,8 @@ export default function App() {
             {!annotations.length && <div className="companion-empty compact">还没有划线。选中文字后按“划线”即可保存。</div>}
           </div>
         </section>
-        <button className="right-reopen" onClick={() => setRightOpen(true)}><ChevronLeft size={17} /></button>
       </aside>
+      <button type="button" className="right-reopen" onClick={() => setRightOpen(true)} aria-label="展开伴读栏" title="展开伴读栏"><ChevronLeft size={17} /></button>
 
       {searchOpen && <div className="command-backdrop" onMouseDown={event => event.target === event.currentTarget && setSearchOpen(false)}>
         <div className="command-panel" role="dialog" aria-label="搜索书中内容">
