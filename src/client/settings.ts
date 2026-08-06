@@ -108,9 +108,9 @@ export const makeEbookStyles = (settings: ReaderSettings): string => {
     body {
       max-width: none; margin: 0 !important; padding: 0 !important;
       font-family: ${font} !important;
-      font-size: ${settings.fontSize}rem; line-height: 1.95; letter-spacing: .025em;
+      font-size: ${settings.fontSize}rem !important; line-height: 1.95 !important; letter-spacing: .025em !important;
     }
-    p, li, blockquote, dd { line-height: 1.95; text-align: justify; }
+    p, li, blockquote, dd { line-height: 1.95 !important; text-align: justify; }
     h1, h2, h3 { font-family: ${font}; font-weight: 500; line-height: 1.45; }
     h1, h2 { margin: 2.2em 0 1.25em; }
     h3 { margin: 1.8em 0 .8em; }
