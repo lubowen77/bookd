@@ -63,8 +63,11 @@ export class LibraryStore {
   }
 
   private bookDir(bookId: string) {
-    if (!/^[\p{L}\p{N}._-]+$/u.test(bookId)) throw new Error('无效的书籍 ID')
-    return path.join(this.root, bookId)
+    if (!/^(?!\.+$)[\p{L}\p{N}._-]+$/u.test(bookId)) throw new Error('无效的书籍 ID')
+    const root = path.resolve(this.root)
+    const resolved = path.resolve(root, bookId)
+    if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) throw new Error('无效的书籍 ID')
+    return resolved
   }
 
   private async readJson<T>(file: string, fallback: T): Promise<T> {
@@ -279,11 +282,12 @@ export class LibraryStore {
   }
 
   async clearAnnotations(bookId: string, annotationId?: string) {
+    const book = await this.getBook(bookId)
+    if (!book) throw new Error('书籍不存在')
     const annotations = await this.listAnnotations(bookId)
     const remaining = annotationId ? annotations.filter(item => item.id !== annotationId) : []
     await atomicJson(path.join(this.bookDir(bookId), 'annotations.json'), remaining)
-    const book = await this.getBook(bookId)
-    const notes = [`# ${book?.title ?? bookId} · 阅读笔记`, '', ...remaining.map(annotationMarkdown)].join('\n')
+    const notes = [`# ${book.title} · 阅读笔记`, '', ...remaining.map(annotationMarkdown)].join('\n')
     await fs.writeFile(path.join(this.bookDir(bookId), 'notes.md'), `${notes.trim()}\n`, 'utf8')
     return { removed: annotations.length - remaining.length, remaining }
   }

@@ -66,6 +66,22 @@ describe('LibraryStore', () => {
     expect(book.chapters.map(chapter => chapter.title)).toEqual(['一本测试书', '第一节', '第二节'])
   })
 
+  it('拒绝纯点书籍 ID 且不会越过书库根目录写文件', async () => {
+    const isolatedRoot = path.join(root, 'isolated-library')
+    const isolatedStore = new LibraryStore(isolatedRoot)
+    await isolatedStore.init()
+    await expect(isolatedStore.importBuffer('...md', Buffer.from('没有标题的正文。')))
+      .rejects.toThrow('无效的书籍 ID')
+    expect(await fs.readdir(root)).toEqual(['isolated-library'])
+    expect(await fs.readdir(isolatedRoot)).toEqual([])
+  })
+
+  it('保留正常中英文书名作为 ID', async () => {
+    expect((await store.importBuffer('opinion.md', Buffer.from('正文。'), { title: '舆论' })).id).toBe('舆论')
+    expect((await store.importBuffer('starlings.md', Buffer.from('正文。'), { title: '随椋鸟飞行-复杂系统的奇境' })).id)
+      .toBe('随椋鸟飞行-复杂系统的奇境')
+  })
+
   it('把 Markdown 文件夹按文件名顺序导入为一本书', async () => {
     const book = await store.importMarkdownDirectory('群鸟文稿', [
       { name: '02-第二章.md', buffer: Buffer.from('# 第二章\n\n后章。') },
@@ -93,5 +109,10 @@ describe('LibraryStore', () => {
     expect(notes).toContain('关键句')
     expect((await store.clearAnnotations(book.id, annotation.id)).removed).toBe(1)
     expect(await fs.readFile(path.join(root, book.id, 'notes.md'), 'utf8')).not.toContain('关键句')
+  })
+
+  it('拒绝清除不存在书籍的批注且不创建目录', async () => {
+    await expect(store.clearAnnotations('attacker-created-dir')).rejects.toThrow('书籍不存在')
+    await expect(fs.access(path.join(root, 'attacker-created-dir'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })
