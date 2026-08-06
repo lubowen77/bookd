@@ -136,8 +136,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
   background: var(--paper-control); color: var(--paper-muted); box-shadow: 0 6px 20px rgba(42,35,27,.08);
   cursor: pointer; opacity: .35; transition: opacity .16s ease, transform .16s ease, box-shadow .16s ease;
 }
-.page-arrow-left { left: 18px; }
-.page-arrow-right { right: 18px; }
+.page-arrow-left { left: 40px; }
+.page-arrow-right { right: 40px; }
 .reader-stage:hover .page-arrow:not(:disabled) { opacity: .82; }
 .page-arrow:hover:not(:disabled), .page-arrow:focus-visible { opacity: 1; transform: translateY(-50%) scale(1.04); box-shadow: 0 8px 24px rgba(42,35,27,.14); }
 .page-arrow:disabled { cursor: default; opacity: .12; }
@@ -190,8 +190,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
   .reader-settings-panel { grid-template-columns: 1fr; gap: 10px; }
   .settings-group, .settings-text-group { justify-content: space-between; }
   .page-arrow { width: 34px; height: 34px; }
-  .page-arrow-left { left: 2px; }
-  .page-arrow-right { right: 2px; }
+  .page-arrow-left { left: 40px; }
+  .page-arrow-right { right: 40px; }
 }
 
 .app-shell[data-paper="white"] { --paper: #fff; --ink: #2a2926; --paper-muted: #665f55; --paper-faint: #958b7d; --paper-link: #7a5b2b; --paper-selection: rgba(197,153,68,.28); --paper-control: rgba(255,255,255,.94); --paper-control-line: rgba(52,48,42,.14); }
@@ -303,8 +303,8 @@ kbd { border: 1px solid #474743; background: #222425; color: #999792; border-rad
   .reader-settings-panel { top: 24px; grid-template-columns: 1fr; gap: 10px; width: calc(100% - 16px); padding: 13px 14px; }
   .settings-group, .settings-text-group { justify-content: space-between; }
   .page-arrow { width: 38px; height: 38px; }
-  .page-arrow-left { left: 6px; }
-  .page-arrow-right { right: 6px; }
+  .page-arrow-left { left: 40px; }
+  .page-arrow-right { right: 40px; }
   .selection-toolbar { bottom: 52px; }
   .selection-toolbar button { padding: 9px; }
   .welcome h1 { font-size: 38px; }
