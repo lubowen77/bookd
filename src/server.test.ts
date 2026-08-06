@@ -80,6 +80,45 @@ describe('bookd HTTP + WebSocket', () => {
     viteDev.close()
   })
 
+  it('拒绝跨源变更请求与 multipart 导入', async () => {
+    await request(server.app)
+      .post('/api/commands/clear-highlights')
+      .set('Origin', 'https://evil.example.com')
+      .send({ bookId: '任意书籍' })
+      .expect(403)
+    await request(server.app)
+      .post('/api/books/import')
+      .set('Origin', 'https://evil.example.com')
+      .attach('book', makeTestEpub(), 'attack.epub')
+      .expect(403)
+    expect(await server.library.listBooks()).toHaveLength(0)
+  })
+
+  it('clear-highlights 缺少 bookId 时返回 400 且保留批注', async () => {
+    const book = await server.library.importBuffer('notes.md', Buffer.from('# 测试\n\n正文。'))
+    await server.library.addAnnotation({
+      bookId: book.id, cfi: 'bookd-md:0:0:2', text: '正文', note: '不可删除',
+      color: '#d6ad55', chapter: '测试', source: 'reader',
+    })
+    server.state.set({ book: book.id }, true)
+    await request(server.app)
+      .post('/api/commands/clear-highlights')
+      .set('Content-Type', 'text/plain')
+      .send('')
+      .expect(400)
+    expect(await server.library.listAnnotations(book.id)).toHaveLength(1)
+    expect(await fs.readFile(path.join(root, 'library', book.id, 'notes.md'), 'utf8')).toContain('不可删除')
+  })
+
+  it('允许无 Origin 的 POST 与 vite dev Origin', async () => {
+    await request(server.app).post('/api/commands/goto').send({ chapter: 0 }).expect(200)
+    await request(server.app)
+      .post('/api/commands/goto')
+      .set('Origin', 'http://127.0.0.1:5173')
+      .send({ chapter: 1 })
+      .expect(200)
+  })
+
   it('双向传递状态与 goto 命令', async () => {
     const address = await server.start()
     const socket = new WebSocket(`ws://${address.host}:${address.port}/ws`)

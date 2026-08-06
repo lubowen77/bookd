@@ -113,6 +113,15 @@ export const createBookdServer = async (overrides: Partial<BookdConfig> = {}): P
     }
     next()
   })
+  const mutationMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+  app.use((request, response, next) => {
+    const origin = request.headers.origin
+    if (mutationMethods.has(request.method) && origin && !isLoopbackOrigin(origin)) {
+      response.status(403).json({ error: '请求来源不受信任' })
+      return
+    }
+    next()
+  })
   app.use(express.json({ limit: '40mb' }))
   app.use((request, response, next) => {
     response.setHeader('X-Content-Type-Options', 'nosniff')
@@ -237,7 +246,7 @@ export const createBookdServer = async (overrides: Partial<BookdConfig> = {}): P
   }))
 
   app.post('/api/commands/clear-highlights', asyncRoute(async (request, response) => {
-    const bookId = String(request.body?.bookId ?? state.get().book ?? '')
+    const bookId = String(request.body?.bookId ?? '')
     if (!bookId) return response.status(400).json({ error: '缺少 bookId' })
     const result = await library.clearAnnotations(bookId, request.body?.annotationId)
     issueCommand({ type: 'clear-highlights', bookId, annotationId: request.body?.annotationId })

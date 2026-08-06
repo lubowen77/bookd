@@ -116,8 +116,14 @@ export const createBookdMcpServer = (baseUrl = process.env.BOOKD_URL ?? 'http://
     },
   }, async ({ book_id, annotation_id }) => {
     try {
+      let resolvedBookId = book_id
+      if (!resolvedBookId) {
+        const current = await request('/api/state')
+        resolvedBookId = current.state?.book
+        if (!resolvedBookId) throw new Error('当前没有打开的书籍')
+      }
       return jsonResult(await request('/api/commands/clear-highlights', {
-        method: 'POST', body: JSON.stringify({ bookId: book_id, annotationId: annotation_id }),
+        method: 'POST', body: JSON.stringify({ bookId: resolvedBookId, annotationId: annotation_id }),
       }))
     } catch (error) { return errorResult(error) }
   })

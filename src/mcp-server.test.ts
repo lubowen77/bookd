@@ -45,6 +45,16 @@ describe('bookd MCP', () => {
     expect(goto.isError).not.toBe(true)
   })
 
+  it('clear_highlights 省略 book_id 时仍清除当前书', async () => {
+    await service.library.addAnnotation({
+      bookId: '测试群鸟', cfi: 'epubcfi(/6/2)', text: '一群椋鸟', note: '待清除',
+      color: '#d6ad55', chapter: '第一章 相遇', source: 'mcp',
+    })
+    const result = await client.callTool({ name: 'clear_highlights', arguments: {} })
+    expect(result.isError).not.toBe(true)
+    expect(await service.library.listAnnotations('测试群鸟')).toHaveLength(0)
+  })
+
   it('可由真实 stdio 子进程连接', async () => {
     const address = service.httpServer.address()
     if (!address || typeof address === 'string') throw new Error('服务未监听')
