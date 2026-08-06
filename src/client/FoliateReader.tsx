@@ -14,6 +14,7 @@ interface Props {
   settings: ReaderSettings
   onProgress: (state: { chapter: string; chapterIndex: number; cfi: string; progress: number; visibleTextHead: string }) => void
   onEdgeHover: (edge: 'left' | 'right' | null) => void
+  onWheelPage: (event: WheelEvent) => void
   onSelection: (selection: ReadingSelection | null) => void
   onCached: (book: BookMeta) => void
   onError: (message: string) => void
@@ -36,14 +37,17 @@ const applySettings = (element: FoliateViewElement, settings: ReaderSettings) =>
   renderer.setStyles?.(makeEbookStyles(settings))
 }
 
-export function FoliateReader({ book, restoreCfi, annotations, command, settings, onProgress, onEdgeHover, onSelection, onCached, onError }: Props) {
+export function FoliateReader({ book, restoreCfi, annotations, command, settings, onProgress, onEdgeHover, onWheelPage, onSelection, onCached, onError }: Props) {
+  const canvas = useRef<HTMLDivElement>(null)
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<FoliateViewElement | null>(null)
   const annotationMap = useRef(new Map<string, Annotation>())
   const logicalChapter = useRef(0)
   const settingsRef = useRef(settings)
+  const onWheelPageRef = useRef(onWheelPage)
   const [loading, setLoading] = useState(true)
   settingsRef.current = settings
+  onWheelPageRef.current = onWheelPage
 
   useEffect(() => {
     let disposed = false
@@ -85,6 +89,7 @@ export function FoliateReader({ book, restoreCfi, annotations, command, settings
             scheduleEdge(mouseEvent.clientX <= 120 ? 'left' : mouseEvent.clientX >= width - 120 ? 'right' : null)
           }
           const onMouseLeave = () => scheduleEdge(null)
+          const onWheel = (wheelEvent: WheelEvent) => onWheelPageRef.current(wheelEvent)
           const onMouseUp = () => {
             requestAnimationFrame(() => {
               const selection = doc.defaultView?.getSelection()
@@ -108,12 +113,14 @@ export function FoliateReader({ book, restoreCfi, annotations, command, settings
           }
           doc.addEventListener('mousemove', onMouseMove, { passive: true })
           doc.addEventListener('mouseleave', onMouseLeave)
+          doc.addEventListener('wheel', onWheel, { passive: false })
           doc.addEventListener('mouseup', onMouseUp)
           doc.addEventListener('keydown', onKeyDown)
           doc.defaultView?.addEventListener('scroll', clearSelection, { passive: true })
           cleanups.push(() => {
             doc.removeEventListener('mousemove', onMouseMove)
             doc.removeEventListener('mouseleave', onMouseLeave)
+            doc.removeEventListener('wheel', onWheel)
             doc.removeEventListener('mouseup', onMouseUp)
             doc.removeEventListener('keydown', onKeyDown)
             doc.defaultView?.removeEventListener('scroll', clearSelection)
@@ -236,6 +243,14 @@ export function FoliateReader({ book, restoreCfi, annotations, command, settings
   }, [book.id])
 
   useEffect(() => {
+    const element = canvas.current
+    if (!element) return
+    const onWheel = (event: WheelEvent) => onWheelPageRef.current(event)
+    element.addEventListener('wheel', onWheel, { passive: false })
+    return () => element.removeEventListener('wheel', onWheel)
+  }, [])
+
+  useEffect(() => {
     const element = view.current
     if (element) applySettings(element, settings)
   }, [settings])
@@ -277,7 +292,7 @@ export function FoliateReader({ book, restoreCfi, annotations, command, settings
   }, [command?.id, book.id])
 
   return (
-    <div className="reader-canvas">
+    <div className="reader-canvas" ref={canvas}>
       <div className="foliate-host" ref={host} />
       {loading && <div className="reader-loading"><span className="orbit-mark" />正在展开《{book.title}》…</div>}
     </div>

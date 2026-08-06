@@ -142,6 +142,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .reader-edge-zone { position: absolute; top: 0; bottom: 0; z-index: 4; width: 120px; }
 .reader-edge-zone-left { left: 0; }
 .reader-edge-zone-right { right: 0; }
+.reader-stage[data-reader-view="scroll"] .reader-edge-zone { pointer-events: none; }
 .reader-edge-zone-left:hover ~ .page-arrow-left:not(:disabled),
 .reader-edge-zone-right:hover ~ .page-arrow-right:not(:disabled),
 .reader-stage.edge-left .page-arrow-left:not(:disabled),

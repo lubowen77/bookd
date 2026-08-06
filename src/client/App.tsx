@@ -46,6 +46,8 @@ export default function App() {
   const localCommandId = useRef(0)
   const fileInput = useRef<HTMLInputElement>(null)
   const directoryInput = useRef<HTMLInputElement>(null)
+  const leftEdgeZone = useRef<HTMLDivElement>(null)
+  const rightEdgeZone = useRef<HTMLDivElement>(null)
 
   const refreshBooks = useCallback(async () => {
     const result = await api.books()
@@ -253,6 +255,39 @@ export default function App() {
     else dispatchLocal({ type: 'page', direction: 'next' })
   }, [activeBook, chapterIndex, dispatchLocal, gotoChapter])
 
+  const pageWheelContext = useRef({
+    format: activeBook?.format,
+    view: settings.view,
+    backward: pageBackward,
+    forward: pageForward,
+  })
+  const wheelLockedUntil = useRef(0)
+  pageWheelContext.current = {
+    format: activeBook?.format,
+    view: settings.view,
+    backward: pageBackward,
+    forward: pageForward,
+  }
+  const handlePageWheel = useCallback((event: WheelEvent) => {
+    const context = pageWheelContext.current
+    if (!context.format || context.format === 'markdown' || context.view === 'scroll' || event.deltaY === 0) return
+    event.preventDefault()
+    const now = performance.now()
+    if (now < wheelLockedUntil.current) return
+    wheelLockedUntil.current = now + 300
+    if (event.deltaY > 0) context.forward()
+    else context.backward()
+  }, [])
+
+  useEffect(() => {
+    wheelLockedUntil.current = 0
+    const zones = [leftEdgeZone.current, rightEdgeZone.current].filter((zone): zone is HTMLDivElement => Boolean(zone))
+    for (const zone of zones) zone.addEventListener('wheel', handlePageWheel, { passive: false })
+    return () => {
+      for (const zone of zones) zone.removeEventListener('wheel', handlePageWheel)
+    }
+  }, [activeBook?.id, handlePageWheel])
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target instanceof HTMLElement ? event.target : null
@@ -348,6 +383,7 @@ export default function App() {
 
       <main
         className={`reader-stage ${pageArrowEdge ? `edge-${pageArrowEdge}` : ''}`}
+        data-reader-view={settings.view}
         onMouseLeave={() => setPageArrowEdge(null)}
       >
         {activeBook && <ReaderSettingsPanel
@@ -359,8 +395,8 @@ export default function App() {
         />}
 
         {activeBook && <>
-          <div className="reader-edge-zone reader-edge-zone-left" aria-hidden="true" />
-          <div className="reader-edge-zone reader-edge-zone-right" aria-hidden="true" />
+          <div ref={leftEdgeZone} className="reader-edge-zone reader-edge-zone-left" aria-hidden="true" />
+          <div ref={rightEdgeZone} className="reader-edge-zone reader-edge-zone-right" aria-hidden="true" />
           <button
             type="button"
             className="page-arrow page-arrow-left"
@@ -409,6 +445,7 @@ export default function App() {
             settings={settings}
             onProgress={progress}
             onEdgeHover={setPageArrowEdge}
+            onWheelPage={handlePageWheel}
             onSelection={updateSelection}
             onCached={book => { setActiveBook(book); void refreshBooks() }}
             onError={setError}
