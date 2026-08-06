@@ -24,16 +24,16 @@ export const useBookdSocket = (
       socket.current = ws
       ws.addEventListener('open', () => {
         setSocketState(current => ({ ...current, connected: true }))
-        if (pending.current) {
-          ws.send(JSON.stringify({ type: 'state:update', state: pending.current }))
-          pending.current = null
-        }
       })
       ws.addEventListener('message', event => {
         const message = JSON.parse(event.data) as SocketMessage
         if (message.type === 'hello') {
           onState(message.state)
           onBooks()
+          if (pending.current) {
+            ws.send(JSON.stringify({ type: 'state:update', state: pending.current }))
+            pending.current = null
+          }
         } else if (message.type === 'state') {
           onState(message.state)
         } else if (message.type === 'books') {
