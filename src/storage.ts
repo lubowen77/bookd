@@ -5,6 +5,13 @@ import type { BookFormat, BookMeta, StoredChapter, Annotation } from './shared.j
 import { extractEpub } from './epub.js'
 import { splitMarkdown } from './markdown.js'
 
+export class InvalidBookIdError extends Error {
+  constructor() {
+    super('无效的书籍 ID')
+    this.name = 'InvalidBookIdError'
+  }
+}
+
 const safeName = (value: string) => value
   .normalize('NFKC')
   .replace(/[^\p{L}\p{N}._-]+/gu, '-')
@@ -63,10 +70,10 @@ export class LibraryStore {
   }
 
   private bookDir(bookId: string) {
-    if (!/^(?!\.+$)[\p{L}\p{N}._-]+$/u.test(bookId)) throw new Error('无效的书籍 ID')
+    if (!/^(?!\.+$)[\p{L}\p{N}._-]+$/u.test(bookId)) throw new InvalidBookIdError()
     const root = path.resolve(this.root)
     const resolved = path.resolve(root, bookId)
-    if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) throw new Error('无效的书籍 ID')
+    if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) throw new InvalidBookIdError()
     return resolved
   }
 

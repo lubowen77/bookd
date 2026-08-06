@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import request from 'supertest'
 import { WebSocket } from 'ws'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBookdServer, type BookdServer } from './server.js'
 import { makeTestEpub } from './test-helpers.js'
 
@@ -117,6 +117,32 @@ describe('bookd HTTP + WebSocket', () => {
       .set('Origin', 'http://127.0.0.1:5173')
       .send({ chapter: 1 })
       .expect(200)
+  })
+
+  it('非法 bookId 与纯点文件名返回 400，且不在书库父目录写文件', async () => {
+    await request(server.app).get('/api/books/a%2Fb').expect(400)
+    const before = await fs.readdir(root)
+    await request(server.app)
+      .post('/api/books/import')
+      .attach('book', Buffer.from('没有标题的正文。'), '...md')
+      .expect(400)
+    expect(await fs.readdir(root)).toEqual(before)
+    expect(await server.library.listBooks()).toHaveLength(0)
+  })
+
+  it('绑定非回环地址时输出无认证警告', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const exposed = await createBookdServer({
+      host: '0.0.0.0', port: 0,
+      libraryDir: path.join(root, 'exposed-library'), stateDir: path.join(root, 'exposed-state'), clientDir: path.join(root, 'client'),
+    })
+    try {
+      await exposed.start()
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/安全警告[\s\S]*不提供身份认证[\s\S]*任何设备/))
+    } finally {
+      await exposed.close()
+      warn.mockRestore()
+    }
   })
 
   it('双向传递状态与 goto 命令', async () => {

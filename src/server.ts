@@ -6,7 +6,7 @@ import multer from 'multer'
 import { WebSocket, WebSocketServer } from 'ws'
 import type { BookdConfig } from './config.js'
 import { getConfig } from './config.js'
-import { LibraryStore } from './storage.js'
+import { InvalidBookIdError, LibraryStore } from './storage.js'
 import { ReadingStateStore } from './state.js'
 import type { ReaderCommand, SocketMessage } from './shared.js'
 
@@ -263,11 +263,17 @@ export const createBookdServer = async (overrides: Partial<BookdConfig> = {}): P
   }
 
   app.use((error: any, _request: Request, response: Response, _next: NextFunction) => {
-    const status = error instanceof multer.MulterError ? 400 : 500
+    const status = error instanceof multer.MulterError || error instanceof InvalidBookIdError ? 400 : 500
     response.status(status).json({ error: error?.message || '服务器错误' })
   })
 
   const start = () => new Promise<{ host: string; port: number }>((resolve, reject) => {
+    if (!LOOPBACK_HOSTS.has(normalizeHostname(config.host))) {
+      console.warn([
+        '⚠️  安全警告：bookd 正绑定到非回环地址。',
+        'bookd 不提供身份认证，同一网络中的任何设备都可能读写你的书库。',
+      ].join('\n'))
+    }
     httpServer.once('error', reject)
     httpServer.listen(config.port, config.host, () => {
       httpServer.off('error', reject)

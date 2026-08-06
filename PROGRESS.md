@@ -85,3 +85,13 @@
 - EPUB 与 Markdown 统一支持全局方向键、左右浮动翻页/切章按钮；输入框和搜索浮层内方向键不抢占。
 - 新增视图、字号、字体和四色纸面设置，写入 `bookd:reader-settings`；EPUB iframe、分页边条、外层舞台和 Markdown 正文同步应用，刷新后保留。
 - `npm run typecheck`、`npm test`（18 项）和 `npm run build` 通过；4123 构建产物已完成桌面、580×720、EPUB、隔离 Markdown 与 MCP 划线验收。
+
+## 服务端安全硬化（2026-08-06）
+
+- 完成 H1–H4：HTTP Host 白名单覆盖所有路由与静态资源；WebSocket 与变更类 HTTP 请求校验 Origin；无 Origin 的 MCP/CLI 请求继续放行，回环来源只比较主机名、不限制端口，服务端没有新增 CORS 放行头。
+- `clear-highlights` HTTP API 不再缺省到当前书；MCP `clear_highlights` 省略 `book_id` 时改为先读当前状态再显式传书籍 ID，8 个 MCP 工具在 4199 隔离实例逐一实测通过。
+- 完成 H3/M5/L1：纯点书籍 ID 被拒，解析路径断言留在书库根内，清除不存在书籍的批注不会创建目录，非法 ID 返回 400；正常中文 ID 保持兼容。
+- 完成 L6：非回环绑定会打印“无身份认证、同网设备可读写”的显著警告，但不阻断用户自主配置。
+- 隔离攻击复现：恶意 WS Origin 被断开；恶意 Origin 的 clear 与 multipart 导入均为 403；无 Origin 的 `text/plain` 空 body 为 400 且原批注完好；`...md` 为 400 且库父目录无新增产物；恶意 Host 为 403。
+- 功能回归：生产页面完成开书、方向键翻章、搜索跳转、阅读设置、WS 上下文同步与批注/笔记实时呈现，控制台无应用错误；`npm run dev` 的 5173→4123 API 代理返回 200、WS 收到 `hello`。应用内浏览器未执行 Vite 开发模块而显示空白，故开发页视觉渲染未在该浏览器环境内确认，API/WS 双端口链路已确认。
+- 自动化：`npm run typecheck`、`npm test`（31 项）、`npm run build` 全部通过；新增安全回归覆盖 Host、WS Origin、变更请求 Origin、危险空 body、路径逃逸、目录副作用、MCP 缺省解析与非回环警告。
