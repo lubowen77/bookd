@@ -1,5 +1,65 @@
+import { spawn, type ChildProcess } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
+
+type SpawnProcess = (
+  command: string,
+  args: readonly string[],
+  options: { stdio: 'ignore' },
+) => ChildProcess
+
+type McpServerDependencies = {
+  fetch?: typeof fetch
+  spawn?: SpawnProcess
+}
+
+const cliPath = fileURLToPath(new URL('./cli.js', import.meta.url))
+let autostartPromise: Promise<void> | null = null
+
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : String(error)
+
+const errorCode = (error: unknown): string | undefined => {
+  if (!error || typeof error !== 'object') return undefined
+  if ('code' in error && typeof error.code === 'string') return error.code
+  return 'cause' in error ? errorCode(error.cause) : undefined
+}
+
+const isNetworkError = (error: unknown) => error instanceof TypeError || errorCode(error) === 'ECONNREFUSED'
+
+const isLoopbackUrl = (url: URL) => {
+  const hostname = url.hostname.replace(/^\[|\]$/g, '')
+  return hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '::1'
+}
+
+const startPort = (url: URL) => url.port || (url.protocol === 'https:' ? '443' : '80')
+
+const spawnBookdStart = (url: URL, spawnProcess: SpawnProcess) => new Promise<void>((resolve, reject) => {
+  const port = startPort(url)
+  let child: ChildProcess
+  try {
+    child = spawnProcess(process.execPath, [cliPath, 'start', '--port', port], { stdio: 'ignore' })
+  } catch (error) {
+    reject(error)
+    return
+  }
+  child.once('error', reject)
+  child.once('exit', (code, signal) => {
+    if (code === 0) resolve()
+    else reject(new Error(`bookd start 退出：${code == null ? `signal ${signal ?? 'unknown'}` : `code ${code}`}`))
+  })
+})
+
+const ensureBookdStarted = (url: URL, spawnProcess: SpawnProcess) => {
+  if (!autostartPromise) {
+    const pending = spawnBookdStart(url, spawnProcess)
+    const shared = pending.finally(() => {
+      if (autostartPromise === shared) autostartPromise = null
+    })
+    autostartPromise = shared
+  }
+  return autostartPromise
+}
 
 const jsonResult = (value: unknown) => ({
   content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }],
@@ -10,14 +70,38 @@ const errorResult = (error: unknown) => ({
   content: [{ type: 'text' as const, text: error instanceof Error ? error.message : String(error) }],
 })
 
-export const createBookdMcpServer = (baseUrl = process.env.BOOKD_URL ?? 'http://127.0.0.1:4123') => {
+export const createBookdMcpServer = (
+  baseUrl = process.env.BOOKD_URL ?? 'http://127.0.0.1:4123',
+  dependencies: McpServerDependencies = {},
+) => {
   const server = new McpServer({ name: 'bookd', version: '0.1.0' })
+  const fetchRequest = dependencies.fetch ?? fetch
+  const spawnProcess = dependencies.spawn ?? spawn
+  const target = new URL(baseUrl)
+  const manualCommand = `node ${cliPath} serve --port ${startPort(target)}`
 
   const request = async (pathname: string, init?: RequestInit) => {
-    const response = await fetch(new URL(pathname, baseUrl), {
+    const url = new URL(pathname, target)
+    const requestOnce = () => fetchRequest(url, {
       ...init,
       headers: { 'Content-Type': 'application/json', ...init?.headers },
     })
+    let response: Response
+    try {
+      response = await requestOnce()
+    } catch (connectionError) {
+      if (!isNetworkError(connectionError) || !isLoopbackUrl(target)) throw connectionError
+      try {
+        await ensureBookdStarted(target, spawnProcess)
+      } catch (startError) {
+        throw new Error(`自动启动 bookd 失败：${errorMessage(startError)}；原始连接错误：${errorMessage(connectionError)}。请手动运行：${manualCommand}`)
+      }
+      try {
+        response = await requestOnce()
+      } catch (retryError) {
+        throw new Error(`bookd 自动启动后重试失败：${errorMessage(retryError)}；首次连接错误：${errorMessage(connectionError)}。请手动运行：${manualCommand}`)
+      }
+    }
     const body = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(body.error || `bookd 返回 ${response.status}`)
     return body

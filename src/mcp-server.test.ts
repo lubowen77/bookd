@@ -1,10 +1,12 @@
+import { type ChildProcess } from 'node:child_process'
+import { EventEmitter } from 'node:events'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBookdMcpServer } from './mcp-server.js'
 import { createBookdServer, type BookdServer } from './server.js'
 import { makeTestEpub } from './test-helpers.js'
@@ -70,5 +72,87 @@ describe('bookd MCP', () => {
     const result = await stdioClient.callTool({ name: 'get_reading_state', arguments: {} })
     expect(JSON.stringify(result.content)).toContain('第一章 相遇')
     await stdioClient.close()
+  })
+
+  it('非回环地址连接失败时不拉起本地服务', async () => {
+    const connectionError = new TypeError('fetch failed', { cause: { code: 'ECONNREFUSED' } })
+    const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(connectionError)
+    const spawnMock = vi.fn()
+    const remoteMcp = createBookdMcpServer('http://192.0.2.10:4123', {
+      fetch: fetchMock,
+      spawn: spawnMock,
+    })
+    const remoteClient = new Client({ name: 'bookd-remote-test', version: '1.0.0' })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    await remoteMcp.connect(serverTransport)
+    await remoteClient.connect(clientTransport)
+
+    const result = await remoteClient.callTool({ name: 'list_books', arguments: {} })
+
+    expect(result.isError).toBe(true)
+    expect(JSON.stringify(result.content)).toContain('fetch failed')
+    expect(spawnMock).not.toHaveBeenCalled()
+    await remoteClient.close()
+  })
+
+  it.each([400, 503])('HTTP %s 响应不触发自动启动', async status => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ error: `HTTP ${status}` }), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    const spawnMock = vi.fn()
+    const httpMcp = createBookdMcpServer('http://127.0.0.1:4123', {
+      fetch: fetchMock,
+      spawn: spawnMock,
+    })
+    const httpClient = new Client({ name: `bookd-http-${status}-test`, version: '1.0.0' })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    await httpMcp.connect(serverTransport)
+    await httpClient.connect(clientTransport)
+
+    const result = await httpClient.callTool({ name: 'list_books', arguments: {} })
+
+    expect(result.isError).toBe(true)
+    expect(JSON.stringify(result.content)).toContain(`HTTP ${status}`)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(spawnMock).not.toHaveBeenCalled()
+    await httpClient.close()
+  })
+
+  it('并发连接失败只拉起一次本地服务并各重试一次', async () => {
+    let serviceReady = false
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () => {
+      if (!serviceReady) throw new TypeError('fetch failed', { cause: { code: 'ECONNREFUSED' } })
+      return new Response(JSON.stringify({ books: [] }), { headers: { 'Content-Type': 'application/json' } })
+    })
+    const spawnMock = vi.fn(() => {
+      const child = new EventEmitter() as ChildProcess
+      setTimeout(() => {
+        serviceReady = true
+        child.emit('exit', 0, null)
+      }, 10)
+      return child
+    })
+    const concurrentMcp = createBookdMcpServer('http://localhost:4199', {
+      fetch: fetchMock,
+      spawn: spawnMock,
+    })
+    const concurrentClient = new Client({ name: 'bookd-concurrent-test', version: '1.0.0' })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    await concurrentMcp.connect(serverTransport)
+    await concurrentClient.connect(clientTransport)
+
+    const results = await Promise.all(Array.from({ length: 6 }, () =>
+      concurrentClient.callTool({ name: 'list_books', arguments: {} })))
+
+    expect(results.every(result => result.isError !== true)).toBe(true)
+    expect(spawnMock).toHaveBeenCalledTimes(1)
+    expect(spawnMock).toHaveBeenCalledWith(
+      process.execPath,
+      [expect.stringMatching(/\/dist\/cli\.js$|\/src\/cli\.js$/), 'start', '--port', '4199'],
+      { stdio: 'ignore' },
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(12)
+    await concurrentClient.close()
   })
 })
