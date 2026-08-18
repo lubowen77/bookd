@@ -107,3 +107,13 @@
 - MCP 回归使用新起的 `dist/mcp.js` stdio 子进程连接 4123：8 个工具可列出，`get_reading_state` 返回当前书、章节、CFI 与非空 `visibleTextHead`。
 - 已知既有风险：从另一本书切回《随椋鸟飞行》且没有该书可恢复位置时，foliate-js 1.0.1 的 text-start 初始化可能在 `Range.setEnd` 抛错并显示提示，但 renderer、字号和滚轮仍可用；本轮未扩大范围修改上游初始化路径。
 - 自动化：`npm run typecheck`、`npm test`（32 项）与 `npm run build` 全部通过；4123 已重启为本轮构建产物。
+
+## 阅读器 UX 第三轮与 MCP 按需启动（2026-08-18）
+
+- 左右边缘信号统一提升到 `app-shell`：侧栏收起后把手默认完全透明，留白探测区与 foliate iframe 正文转发都能同时点亮该侧把手和翻页钮；把手自身 hover 与 `focus-visible` 继续兜底，移入时不闪烁。
+- 把手固定到顶栏下方 `top: 120px`，并用 12px 伪元素扩展热区；翻页钮继续垂直居中且保留 72px 热区。无书时把手常驻可见，`hover: none` 设备上把手与可用翻页钮均以 0.5 透明度常显，≤820px 移动抽屉逻辑不变。
+- MCP 薄客户端只在回环地址发生网络层连接失败时，等待一次 `cli.js start --port …` 后重放请求；HTTP 错误与远程地址不会触发。并发失败共享模块级启动 Promise，MCP 仍不直接拉起 `serve`，失败信息保留底层错误并给出前台手动命令。
+- 单测新增远程回环门槛、HTTP 400/503 与 6 路并发防抖覆盖；随机隔离端口真实验收首次 `list_books` 632ms 返回，MCP 退出后服务继续存活，第二次会话复用同一 PID。生产 `dist/mcp.js` 的 8 个工具也已逐一调用通过，临时批注按返回 ID 清理。
+- 真实 Playwright Chromium 覆盖 1440×900、1000×720、580×720、触摸媒体、无书、Markdown 首末章、留白与 iframe 两条边缘路径、滚轮/方向键/扩展热区，以及明暗主题 × 四色纸面；`visibleTextHead` 在翻页回归中保持非空，控制台没有应用错误。
+- `docs/design/bookd-reader-implementation.png` 已更新为亮色米白纸面、打开《随椋鸟飞行》正文且双侧栏展开的 1440×900 实况，README 顶图同步指向该资产；历史概念图保留。
+- 自动化：`npm run typecheck`、`npm test`（36 项）与 `npm run build` 全部通过。

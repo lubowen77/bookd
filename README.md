@@ -2,9 +2,7 @@
 
 本地优先的 AI 伴读阅读器：人类在浏览器里读 EPUB、MOBI、AZW3 与 Markdown，AI 通过 MCP 精确获取当前书、章节、CFI、可见文字和选区，也能反向跳转与高亮。
 
-![bookd 阅读器概念图](docs/design/bookd-reader-concept.png)
-
-![bookd 阅读器实现](docs/design/bookd-reader-implementation.png)
+![bookd 阅读器实况](docs/design/bookd-reader-implementation.png)
 
 ## 核心边界
 
