@@ -323,7 +323,7 @@ export default function App() {
   } as CSSProperties
 
   return (
-    <div className={`app-shell ${dark ? 'theme-dark' : 'theme-light'} ${!leftOpen ? 'left-closed' : ''} ${!rightOpen ? 'right-closed' : ''}`}
+    <div className={`app-shell ${dark ? 'theme-dark' : 'theme-light'} ${activeBook ? 'has-book' : ''} ${!leftOpen ? 'left-closed' : ''} ${!rightOpen ? 'right-closed' : ''} ${pageArrowEdge ? `edge-${pageArrowEdge}` : ''}`}
       data-paper={settings.paper}
       data-font={settings.fontFamily}
       style={readerStyle}
@@ -382,7 +382,7 @@ export default function App() {
       <button type="button" className="side-reopen" onClick={() => setLeftOpen(true)} aria-label="展开书库" title="展开书库"><ChevronRight size={17} /></button>
 
       <main
-        className={`reader-stage ${pageArrowEdge ? `edge-${pageArrowEdge}` : ''}`}
+        className="reader-stage"
         data-reader-view={settings.view}
         onMouseLeave={() => setPageArrowEdge(null)}
       >
@@ -395,8 +395,20 @@ export default function App() {
         />}
 
         {activeBook && <>
-          <div ref={leftEdgeZone} className="reader-edge-zone reader-edge-zone-left" aria-hidden="true" />
-          <div ref={rightEdgeZone} className="reader-edge-zone reader-edge-zone-right" aria-hidden="true" />
+          <div
+            ref={leftEdgeZone}
+            className="reader-edge-zone reader-edge-zone-left"
+            aria-hidden="true"
+            onMouseEnter={() => setPageArrowEdge('left')}
+            onMouseLeave={() => setPageArrowEdge(null)}
+          />
+          <div
+            ref={rightEdgeZone}
+            className="reader-edge-zone reader-edge-zone-right"
+            aria-hidden="true"
+            onMouseEnter={() => setPageArrowEdge('right')}
+            onMouseLeave={() => setPageArrowEdge(null)}
+          />
           <button
             type="button"
             className="page-arrow page-arrow-left"

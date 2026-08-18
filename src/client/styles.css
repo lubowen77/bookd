@@ -96,14 +96,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .chapter-list span, .chapter-list small { font-size: 10px; font-variant-numeric: tabular-nums; }
 .chapter-list strong { font-family: "Noto Serif SC", serif; font-size: 12px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-reopen, .right-reopen {
-  display: none; position: fixed; top: 50%; z-index: 32; width: 24px; height: 64px;
-  align-items: center; justify-content: center; padding: 0; transform: translateY(-50%);
+  display: none; position: fixed; top: 120px; z-index: 32; width: 24px; height: 64px;
+  align-items: center; justify-content: center; padding: 0;
   border: 1px solid var(--line-strong); background: color-mix(in srgb, var(--chrome-2) 92%, transparent);
   color: var(--chrome-muted); cursor: pointer; opacity: .58; transition: opacity .15s ease, color .15s ease;
 }
 .side-reopen { left: 0; border-left: 0; border-radius: 0 8px 8px 0; }
 .right-reopen { right: 0; border-right: 0; border-radius: 8px 0 0 8px; }
-.side-reopen:hover, .right-reopen:hover { color: var(--chrome-text); opacity: 1; }
+.side-reopen::before, .right-reopen::before { content: ''; position: absolute; inset: -12px; }
+.app-shell.has-book .side-reopen, .app-shell.has-book .right-reopen { opacity: 0; }
+.app-shell.edge-left .side-reopen, .app-shell.edge-right .right-reopen { opacity: .58; }
+.app-shell .side-reopen:hover, .app-shell .right-reopen:hover,
+.app-shell .side-reopen:focus-visible, .app-shell .right-reopen:focus-visible { color: var(--chrome-text); opacity: 1; }
 .left-closed .side-reopen, .right-closed .right-reopen { display: flex; }
 
 .reader-stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; container: reader-stage / inline-size; background: var(--paper); color: var(--ink); }
@@ -143,10 +147,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .reader-edge-zone-left { left: 0; }
 .reader-edge-zone-right { right: 0; }
 .reader-stage[data-reader-view="scroll"] .reader-edge-zone { pointer-events: none; }
-.reader-edge-zone-left:hover ~ .page-arrow-left:not(:disabled),
-.reader-edge-zone-right:hover ~ .page-arrow-right:not(:disabled),
-.reader-stage.edge-left .page-arrow-left:not(:disabled),
-.reader-stage.edge-right .page-arrow-right:not(:disabled) { opacity: .82; }
+.app-shell.edge-left .page-arrow-left:not(:disabled),
+.app-shell.edge-right .page-arrow-right:not(:disabled) { opacity: .82; }
 .page-arrow:hover:not(:disabled), .page-arrow:focus-visible { opacity: 1; transform: translateY(-50%) scale(1.04); box-shadow: 0 8px 24px rgba(42,35,27,.14); }
 .page-arrow:disabled { cursor: default; opacity: 0; }
 
@@ -320,6 +322,11 @@ kbd { border: 1px solid #474743; background: #222425; color: #999792; border-rad
   .selection-toolbar { bottom: 52px; }
   .selection-toolbar button { padding: 9px; }
   .welcome h1 { font-size: 38px; }
+}
+
+@media (hover: none) {
+  .page-arrow:not(:disabled) { opacity: .5; }
+  .app-shell.left-closed .side-reopen, .app-shell.right-closed .right-reopen { opacity: .5; }
 }
 
 @media (prefers-reduced-motion: reduce) {
